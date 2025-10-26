@@ -1,4 +1,3 @@
-// common.hpp
 #ifndef COMMON_HPP
 #define COMMON_HPP
 
@@ -6,24 +5,21 @@
 #include <cmath>
 #include <limits>
 
-// Configuration constants (tweak as needed)
 constexpr float L1 = 0.7f;
 constexpr float L2 = 1.2f;
-constexpr float THETA1_STEP = 0.02f;
-constexpr float THETA2_STEP = 0.02f;
-constexpr float WAYPOINT_TOLERANCE = 0.18f; // not used here but kept
+constexpr float THETA1_STEP = 0.003f;
+constexpr float THETA2_STEP = 0.003f;
+constexpr float WAYPOINT_TOLERANCE = 0.18f; 
 constexpr float M_PI = 3.14159265358979323846f;
 
 struct Obstacle { float x, y, r; };
 struct ArmConfig { float theta1, theta2; };
 
-// forward kinematics
 inline void forwardKinematics(float t1, float t2, float &x, float &y) {
     x = L1 * std::cos(t1) + L2 * std::cos(t1 + t2);
     y = L1 * std::sin(t1) + L2 * std::sin(t1 + t2);
 }
 
-// line-circle intersection
 inline bool lineCircleCollision(float x1, float y1, float x2, float y2, const Obstacle &obs) {
     float dx = x2 - x1, dy = y2 - y1;
     float fx = x1 - obs.x, fy = y1 - obs.y;
@@ -38,7 +34,6 @@ inline bool lineCircleCollision(float x1, float y1, float x2, float y2, const Ob
     return (t1 >= 0.0f && t1 <= 1.0f) || (t2 >= 0.0f && t2 <= 1.0f);
 }
 
-// check if config collides with any obstacle (links as line segments)
 inline bool checkCollision(float t1, float t2, const std::vector<Obstacle> &obstacles) {
     float x0 = 0.0f, y0 = 0.0f;
     float x1 = L1 * std::cos(t1), y1 = L1 * std::sin(t1);
@@ -50,9 +45,8 @@ inline bool checkCollision(float t1, float t2, const std::vector<Obstacle> &obst
     return false;
 }
 
-// discretization helpers
 inline int theta1Count() {
-    return int(std::floor((2.0f * M_PI) / THETA1_STEP)) + 1; // inclusive endpoints approx
+    return int(std::floor((2.0f * M_PI) / THETA1_STEP)) + 1;
 }
 inline int theta2Count() {
     return int(std::floor((2.0f * M_PI) / THETA2_STEP)) + 1;
@@ -66,10 +60,7 @@ inline float indexToTheta2(int j) {
 inline int idxFromIJ(int i, int j, int W) { return i * W + j; }
 inline void ijFromIdx(int idx, int W, int &i, int &j) { i = idx / W; j = idx % W; }
 
-inline int findNearestValidNodeToXY(float xgoal, float ygoal,
-                                    const std::vector<bool> &valid,
-                                    int W, int H)
-{
+inline int findNearestValidNodeToXY(float xgoal, float ygoal, const std::vector<bool> &valid, int W, int H) {
     int bestIdx = -1;
     float bestDist2 = std::numeric_limits<float>::infinity();
     for (int i = 0; i < H; ++i) {
@@ -89,4 +80,4 @@ inline int findNearestValidNodeToXY(float xgoal, float ygoal,
     return bestIdx;
 }
 
-#endif // COMMON_HPP
+#endif 

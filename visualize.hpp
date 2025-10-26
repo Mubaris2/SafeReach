@@ -10,14 +10,12 @@ const int HEIGHT = 600;
 const float OFFSET_X1 = 0.0f;
 const float OFFSET_X2 = WIDTH / 2.0f;
 const float OFFSET_Y = HEIGHT / 2.0f;
-const float SCALE = 150.0f;  // pixels per unit length
+const float SCALE = 150.0f; 
 
-// Convert world coordinates to screen coordinates
 inline SDL_FPoint worldToScreen(float x, float y, float offsetX) {
     return {offsetX + WIDTH / 4 + x * SCALE, HEIGHT / 2 - y * SCALE};
 }
 
-// Draw a filled circle
 inline void drawCircle(SDL_Renderer* renderer, float cx, float cy, float r) {
     for (int w = -r; w <= r; ++w) {
         for (int h = -r; h <= r; ++h) {
@@ -27,7 +25,6 @@ inline void drawCircle(SDL_Renderer* renderer, float cx, float cy, float r) {
     }
 }
 
-// Draw a point representing start/goal
 inline void drawPoint(SDL_Renderer* renderer, const ArmConfig& cfg, float offsetX, Uint8 r, Uint8 g, Uint8 b) {
     float x = L1 * cosf(cfg.theta1) + L2 * cosf(cfg.theta1 + cfg.theta2);
     float y = L1 * sinf(cfg.theta1) + L2 * sinf(cfg.theta1 + cfg.theta2);
@@ -36,7 +33,6 @@ inline void drawPoint(SDL_Renderer* renderer, const ArmConfig& cfg, float offset
     drawCircle(renderer, p.x, p.y, 5);
 }
 
-// Draw arm configuration
 inline void drawArm(SDL_Renderer* renderer, const ArmConfig& cfg, float offsetX) {
     float x1 = L1 * cosf(cfg.theta1);
     float y1 = L1 * sinf(cfg.theta1);
@@ -47,19 +43,16 @@ inline void drawArm(SDL_Renderer* renderer, const ArmConfig& cfg, float offsetX)
     SDL_FPoint joint = worldToScreen(x1, y1, offsetX);
     SDL_FPoint end = worldToScreen(x2, y2, offsetX);
 
-    // Arm segments (green)
     SDL_SetRenderDrawColor(renderer, 0, 128, 0, 255);
     SDL_RenderDrawLineF(renderer, base.x, base.y, joint.x, joint.y);
     SDL_RenderDrawLineF(renderer, joint.x, joint.y, end.x, end.y);
 
-    // Arm joint (black)
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     drawCircle(renderer, base.x, base.y, 3);
     drawCircle(renderer, end.x, end.y, 3);
     drawCircle(renderer, joint.x, joint.y, 3);
 }
 
-// Draw obstacles
 inline void drawObstacles(SDL_Renderer* renderer, const std::vector<Obstacle>& obs, float offsetX) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     for (const auto& o : obs) {
@@ -68,7 +61,6 @@ inline void drawObstacles(SDL_Renderer* renderer, const std::vector<Obstacle>& o
     }
 }
 
-// Draw the entire path (as yellow trace)
 inline void drawPath(SDL_Renderer* renderer, const std::vector<ArmConfig>& path, float offsetX) {
     if (path.empty()) return;
     SDL_SetRenderDrawColor(renderer, 255, 215, 0, 255);
@@ -83,17 +75,11 @@ inline void drawPath(SDL_Renderer* renderer, const std::vector<ArmConfig>& path,
     }
 }
 
-void visualize(
-    const std::vector<ArmConfig> &serialPath,
-    const std::vector<ArmConfig> &parallelPath,
-    const std::vector<Obstacle> &obstacles,
-    double serialTime, double parallelTime, const std::string &testName)
+void visualize(const std::vector<ArmConfig> &serialPath, const std::vector<ArmConfig> &parallelPath,
+    const std::vector<Obstacle> &obstacles, double serialTime, double parallelTime, const std::string &testName)
 {
 
-    SDL_Window *window = SDL_CreateWindow("Arm Path Comparison",
-                                          SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                          WIDTH, HEIGHT,
-                                          SDL_WINDOW_RESIZABLE);
+    SDL_Window *window = SDL_CreateWindow("Arm Path Comparison", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE);
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
     TTF_Init();
@@ -112,74 +98,83 @@ void visualize(
         SDL_FreeSurface(surface);
     };    
 
-    // double maxTime = std::max(serialTime, parallelTime);
-    // double delay1 = maxTime / std::max<size_t>(1, serialPath.size());
-    // double delay2 = maxTime / std::max<size_t>(1, parallelPath.size());
-    
-    bool quit = false;
+    Uint32 startTime = SDL_GetTicks();
     SDL_Event e;
+    bool quit = false;
+    int skipRate = std::max(1, (int)(serialPath.size() / 500));
+    double maxTime = std::max(serialTime, parallelTime);
+    double scale = 1000.0 / maxTime;
+    double parallelDelay = (maxTime - serialTime) * scale;
+    double serialDelay = (maxTime - parallelTime) * scale;
+
+    size_t i = 0, j = 0;
     while (!quit) {
-        size_t maxFrames = std::max(serialPath.size(), parallelPath.size());
-        for (size_t i = 0; i < maxFrames && !quit; ++i) {
-            // Poll events at start of frame and exit immediately if requested
+        while (!quit && (i < serialPath.size() || j < parallelPath.size())) {
             while (SDL_PollEvent(&e)) {
-                if (e.type == SDL_QUIT) { quit = true; break; }
+                if (e.type == SDL_QUIT) quit = true;
             }
-            if (quit) break;
+            Uint32 elapsed = SDL_GetTicks() - startTime;
+
+            if (elapsed > serialDelay && i < serialPath.size()) i += skipRate;
+            if (elapsed > parallelDelay && j < parallelPath.size()) j += skipRate;
+
             SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
             SDL_RenderClear(renderer);
-            
+
             drawObstacles(renderer, obstacles, OFFSET_X1);
             drawObstacles(renderer, obstacles, OFFSET_X2);
 
-            // Mark start and goal positions
-            drawPoint(renderer, serialPath.front(), OFFSET_X1, 255, 0, 0); // Start (red)
-            drawPoint(renderer, serialPath.back(), OFFSET_X1, 0, 255, 0);  // Goal (green)
-            drawPoint(renderer, parallelPath.front(), OFFSET_X2, 255, 0, 0); // Start (red)
-            drawPoint(renderer, parallelPath.back(), OFFSET_X2, 0, 255, 0);  // Goal (green)
-            
-            // Draw arms
-            if (i < serialPath.size()) drawArm(renderer, serialPath[i], OFFSET_X1);
-            if (i < parallelPath.size()) drawArm(renderer, parallelPath[i], OFFSET_X2);
-            
+            if (i < serialPath.size())  drawArm(renderer, serialPath[i], OFFSET_X1);
+            else drawArm(renderer, serialPath.back(), OFFSET_X1);
+            if (j < parallelPath.size()) drawArm(renderer, parallelPath[j], OFFSET_X2);
+            else drawArm(renderer, parallelPath.back(), OFFSET_X2);
+
             drawPath(renderer, serialPath, OFFSET_X1);
             drawPath(renderer, parallelPath, OFFSET_X2);
 
-            // Labels
-            drawText("Serial", OFFSET_X1 + OFFSET_X2 / 2, 30);
-            drawText("Parallel", OFFSET_X2 + OFFSET_X2 / 2, 30);
-            drawText("Test: " + testName, OFFSET_X2 - 20, 10);
+            drawPoint(renderer, serialPath.front(), OFFSET_X1, 255, 0, 0);
+            drawPoint(renderer, serialPath.back(), OFFSET_X1, 0, 255, 0);
+            drawPoint(renderer, parallelPath.front(), OFFSET_X2, 255, 0, 0);
+            drawPoint(renderer, parallelPath.back(), OFFSET_X2, 0, 255, 0);
 
-            // Divider line
+            drawText("Serial", OFFSET_X1 + OFFSET_X2 / 2, 20);
+            drawText("Parallel", OFFSET_X2 + OFFSET_X2 / 2, 20);
+            drawText("Test: " + testName, OFFSET_X2 - 20, 10);
             SDL_SetRenderDrawColor(renderer, 150, 150, 150, 255);
             SDL_RenderDrawLine(renderer, WIDTH / 2, 50, WIDTH / 2, HEIGHT - 100);
 
-            char stats[256];
-            snprintf(stats, sizeof(stats),
-                     "Serial: %.3fs   Parallel: %.3fs   Speedup: %.2fx",
-                     serialTime, parallelTime, serialTime / parallelTime);
+            char stats[128];
+            snprintf(stats, sizeof(stats), "Serial: %.3fs  Parallel: %.3fs  Speedup: %.2fx",
+                    serialTime, parallelTime, serialTime / parallelTime);
             drawText(stats, WIDTH / 2 - 200, HEIGHT - 40);
+            drawText("Time difference is not accurately represented in animation as it is spedup", WIDTH / 2 - 240, HEIGHT - 20);
 
             SDL_RenderPresent(renderer);
-            SDL_Delay(100);
-            // Poll again after delay to handle a close during sleep
+            SDL_Delay(1);
             while (SDL_PollEvent(&e)) {
                 if (e.type == SDL_QUIT) { quit = true; break; }
             }
             if (quit) break;
         }
 
-        // Finished – wait for SPACE to continue
-        drawText("Press SPACE to continue...", WIDTH / 2 - 100, HEIGHT / 2 + 200);
+        drawText("Press r to restart", WIDTH / 2 - 80, HEIGHT / 2 + 220);
+        drawText("Press SPACE to continue...", WIDTH / 2 - 100, HEIGHT / 2 + 240);
         SDL_RenderPresent(renderer);
-        // Wait for SPACE or quit. This loop exits immediately if SDL_QUIT is received.
         bool waiting = true;
         while (waiting && !quit) {
             while (SDL_PollEvent(&e)) {
                 if (e.type == SDL_QUIT) { quit = true; waiting = false; break; }
-                if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_SPACE) { waiting = false; break; }
+                if (e.type == SDL_KEYDOWN){
+                    if(e.key.keysym.sym == SDLK_SPACE) { quit = true; break; }
+                    if(e.key.keysym.sym == SDLK_r){
+                        waiting = false;
+                        i = 0, j = 0;
+                        startTime = SDL_GetTicks();
+                        break;
+                    }
+                }
             }
-            SDL_Delay(10);
+            SDL_Delay(1);
         }
     }
 

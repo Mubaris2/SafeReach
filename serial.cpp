@@ -1,18 +1,13 @@
-// serial.cpp
 #include "serial.hpp"
 #include <queue>
 #include <iostream>
 #include <algorithm>
 
-std::vector<ArmConfig> runSerial(const std::vector<Obstacle> &obstacles,
-                                float start_x, float start_y,
-                                float goal_x, float goal_y)
-{
-    int W = theta2Count(); // columns (t2 index)
-    int H = theta1Count(); // rows (t1 index)
+std::vector<ArmConfig> runSerial(const std::vector<Obstacle> &obstacles, float start_x, float start_y, float goal_x, float goal_y) {
+    int W = theta2Count();
+    int H = theta1Count();
     int N = W * H;
 
-    // 1) Precompute valid nodes (collision-free)
     std::vector<bool> valid(N, false);
     for (int i = 0; i < H; ++i) {
         float t1 = indexToTheta1(i);
@@ -23,7 +18,6 @@ std::vector<ArmConfig> runSerial(const std::vector<Obstacle> &obstacles,
         }
     }
 
-    // 2) Find nearest valid nodes to start and goal end-effector positions
     int startIdx = findNearestValidNodeToXY(start_x, start_y, valid, W, H);
     int goalIdx  = findNearestValidNodeToXY(goal_x,  goal_y,  valid, W, H);
 
@@ -32,7 +26,6 @@ std::vector<ArmConfig> runSerial(const std::vector<Obstacle> &obstacles,
         return {};
     }
 
-    // 3) BFS on grid graph (4-neighborhood in (i,j) indices)
     std::vector<int> parent(N, -1);
     std::vector<char> visited(N, 0);
     std::queue<int> q;
@@ -45,7 +38,7 @@ std::vector<ArmConfig> runSerial(const std::vector<Obstacle> &obstacles,
         int cur = q.front(); q.pop();
         if (cur == goalIdx) { found = 1; break; }
         int ci, cj; ijFromIdx(cur, W, ci, cj);
-        const int di[4] = {1,-1,0,0}; // only single-joint moves
+        const int di[4] = {1,-1,0,0}; 
         const int dj[4] = {0,0,1,-1};
         for (int k=0;k<4;++k) {
             int ni = ci + di[k], nj = cj + dj[k];
@@ -64,7 +57,6 @@ std::vector<ArmConfig> runSerial(const std::vector<Obstacle> &obstacles,
         return {};
     }
 
-    // 4) reconstruct path
     std::vector<ArmConfig> path;
     int cur = goalIdx;
     while (cur != -1) {

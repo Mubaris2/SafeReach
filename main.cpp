@@ -80,9 +80,9 @@ int main() {
             continue;
         }
 
-        // Visualize both side by side
         std::cout << "Launching SDL visualization...\n";
         visualize(serialPath, parallelPath, t.obstacles, t2 - t1, t4 - t3, t.name);
+        std::cout << "Speedup in this testcase: " << (t2 - t1) / (t4 - t3) << "x\n";
         std::cout << "Test case \"" << t.name << "\" completed.\n";
     }
     std::cout << "All test cases completed.\n";

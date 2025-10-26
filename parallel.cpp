@@ -1,23 +1,15 @@
-// parallel.cpp
 #include "parallel.hpp"
 #include <queue>
 #include <iostream>
 #include <omp.h>
 #include <algorithm>
 
-// Parallelized preprocessing: collision tests & adjacency marking
-std::vector<ArmConfig> runParallel(const std::vector<Obstacle> &obstacles,
-                                   float start_x, float start_y,
-                                   float goal_x, float goal_y)
-{
-    int W = theta2Count(); // columns (t2)
-    int H = theta1Count(); // rows (t1)
+std::vector<ArmConfig> runParallel(const std::vector<Obstacle> &obstacles, float start_x, float start_y, float goal_x, float goal_y) {
+    int W = theta2Count();
+    int H = theta1Count();
     int N = W * H;
 
     std::vector<bool> valid(N, false);
-
-    // 1) Parallel collision checking for each grid node
-    // count valid nodes using reduction
     int validCount = 0;
     #pragma omp parallel for reduction(+:validCount) schedule(dynamic, 32)
     for (int idx = 0; idx < N; ++idx) {
@@ -39,9 +31,6 @@ std::vector<ArmConfig> runParallel(const std::vector<Obstacle> &obstacles,
         return {};
     }
 
-    // 2) Optionally build adjacency lists (we will generate neighbors on the fly in BFS to save memory)
-    // BUT we will precompute list of valid node indices to speed up searches for nearest start/goal
-    // find nearest valid nodes to start and goal (parallel search)
     auto nearest_search = [&](float gx, float gy) {
         int bestIdx = -1;
         float bestDist2 = std::numeric_limits<float>::infinity();
@@ -70,10 +59,7 @@ std::vector<ArmConfig> runParallel(const std::vector<Obstacle> &obstacles,
                     bestIdx = localBest;
                 }
             }
-        } // omp parallel
-        return bestIdx;
-    };
-
+        } 
     int startIdx = nearest_search(start_x, start_y);
     int goalIdx  = nearest_search(goal_x,  goal_y);
 
@@ -82,7 +68,6 @@ std::vector<ArmConfig> runParallel(const std::vector<Obstacle> &obstacles,
         return {};
     }
 
-    // 3) BFS on grid graph (serial BFS; preprocessing was the heavy part)
     std::vector<int> parent(N, -1);
     std::vector<char> visited(N, 0);
     std::queue<int> q;
@@ -112,7 +97,6 @@ std::vector<ArmConfig> runParallel(const std::vector<Obstacle> &obstacles,
         return {};
     }
 
-    // 4) reconstruct path
     std::vector<ArmConfig> path;
     int cur = goalIdx;
     while (cur != -1) {
