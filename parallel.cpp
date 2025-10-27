@@ -60,6 +60,8 @@ std::vector<ArmConfig> runParallel(const std::vector<Obstacle> &obstacles, float
                 }
             }
         } 
+        return bestIdx;
+    };
     int startIdx = nearest_search(start_x, start_y);
     int goalIdx  = nearest_search(goal_x,  goal_y);
 
